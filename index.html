@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="IntelStream: Real-time strategic intelligence for organizational consumers.">
+    <title>IntelStream | Professional Intelligence Dashboard</title>
+    
+    <!-- Meta Tags for Social Preview -->
+    <meta property="og:title" content="IntelStream Dashboard">
+    <meta property="og:description" content="Resolving organizational tension through real-time data visualization.">
+    <meta property="og:type" content="website">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        body { font-family: 'Inter', sans-serif; transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .skeleton { background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%); background-size: 200% 100%; animation: loading 1.5s infinite; }
+        @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .chart-container { position: relative; height: 320px; width: 100%; }
+        .error-shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+    </style>
+</head>
+<body id="app-body" class="bg-slate-50 text-slate-900 min-h-screen selection:bg-blue-100 antialiased">
+
+    <!-- Global Error System -->
+    <div id="error-toast" class="hidden fixed top-6 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4">
+        <div class="bg-red-600 text-white p-4 rounded-xl shadow-2xl flex items-center justify-between error-shake">
+            <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span id="error-message" class="text-sm font-500">Node sync interrupted.</span>
+            </div>
+            <button onclick="hideError()" class="text-white/70 hover:text-white text-xl">&times;</button>
+        </div>
+    </div>
+
+    <!-- A/B Test Banner -->
+    <div id="ab-banner" class="w-full py-2.5 px-6 text-center text-[10px] font-bold uppercase tracking-[0.2em] transition-colors duration-500"></div>
+
+    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 py-4">
+        <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+            <div class="flex items-center gap-2 group cursor-pointer" onclick="forceRefresh()">
+                <div id="logo-bg" class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center transition-all group-hover:scale-110">
+                    <div class="w-3 h-3 bg-white rounded-full"></div>
+                </div>
+                <span class="text-xl font-600 tracking-tight">IntelStream</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <select id="strategy-profile" onchange="handleProfileChange()" aria-label="Select Strategy Profile" class="hidden md:block bg-slate-100 border-none rounded-lg px-3 py-2 text-xs font-600 focus:ring-2 focus:ring-blue-500 cursor-pointer hover:bg-slate-200 transition-colors">
+                    <option value="growth">Growth Profile</option>
+                    <option value="risk">Risk Mitigation Profile</option>
+                </select>
+                <button id="cta-button" class="bg-slate-900 text-white px-5 py-2.5 rounded-xl text-sm font-600 hover:opacity-90 transition-all shadow-sm active:scale-95">
+                    Upgrade Access
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-6 py-12">
+        <header class="mb-12">
+            <h1 id="main-heading" class="text-4xl md:text-5xl font-600 tracking-tight text-slate-900">Market Intelligence</h1>
+            <p id="sub-heading" class="text-slate-500 mt-3 max-w-2xl text-lg md:text-xl font-400">Transforming raw node data into actionable organizational outcomes.</p>
+        </header>
+
+        <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-12">
+            <div class="flex flex-wrap gap-4">
+                <div class="flex flex-col gap-2">
+                    <label class="text-[10px] font-bold uppercase text-slate-400 tracking-widest ml-1">Geographic Node</label>
+                    <select id="node-select" onchange="handleNodeChange()" class="bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-600 focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm min-w-[200px]">
+                        <option value="london">London Hub</option>
+                        <option value="new-york">New York Hub</option>
+                        <option value="singapore">Singapore Hub</option>
+                        <option value="tokyo">Tokyo Hub</option>
+                    </select>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <label class="text-[10px] font-bold uppercase text-slate-400 tracking-widest ml-1">Visualization</label>
+                    <div class="bg-slate-200 p-1 rounded-xl flex">
+                        <button onclick="toggleView('list')" id="list-btn" class="px-6 py-2 rounded-lg text-xs font-bold transition-all bg-white shadow-sm">List View</button>
+                        <button onclick="toggleView('chart')" id="chart-btn" class="px-6 py-2 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-700">Analytics</button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+                <span id="cache-status" class="text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all">Syncing...</span>
+                <button onclick="forceRefresh()" class="p-2 text-slate-400 hover:text-blue-600 transition-all hover:rotate-180 duration-500" title="Force Sync">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="grid lg:grid-cols-3 gap-8 items-start">
+            <div class="space-y-8">
+                <!-- Environmental Intelligence -->
+                <div class="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-blue-50 rounded-full blur-3xl opacity-50"></div>
+                    <h2 class="text-xs font-bold uppercase tracking-[0.2em] text-blue-600 mb-8">Climate Signal</h2>
+                    <div id="weather-display" class="min-h-[80px]">
+                        <div class="h-12 w-32 skeleton rounded-xl mb-4"></div>
+                    </div>
+                </div>
+
+                <!-- Strategic Summary -->
+                <div class="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden group shadow-xl">
+                    <div class="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                    <div class="relative z-10">
+                        <h3 class="text-sm font-bold uppercase tracking-widest mb-4 text-blue-400">Core Node Analytics</h3>
+                        <p id="node-summary" class="text-sm text-slate-400 leading-relaxed mb-8">Initializing strategic alignment and node validation protocols...</p>
+                        <div class="space-y-4">
+                            <div class="flex justify-between text-[10px] uppercase font-bold tracking-[0.2em]">
+                                <span>Volatility Factor</span>
+                                <span id="vol-value">--%</span>
+                            </div>
+                            <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                                <div id="vol-bar" class="bg-blue-500 h-full transition-all duration-1000 ease-out" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Intelligence Container -->
+            <div class="lg:col-span-2">
+                <div id="intel-container" class="bg-white rounded-3xl p-10 shadow-sm border border-slate-100 min-h-[560px] relative overflow-hidden">
+                    
+                    <div id="loading-overlay" class="hidden absolute inset-0 bg-white/70 backdrop-blur-[3px] z-20 flex items-center justify-center rounded-3xl transition-opacity">
+                        <div class="flex flex-col items-center gap-4">
+                            <div class="w-10 h-10 border-4 border-blue-600/10 border-t-blue-600 rounded-full animate-spin"></div>
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-[0.3em]">Validating Streams</span>
+                        </div>
+                    </div>
+
+                    <div id="view-list" class="space-y-8">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-50">
+                            <h2 class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Validated Intel Feed</h2>
+                            <div class="relative group">
+                                <input type="text" id="intel-search" placeholder="Filter articles..." class="text-xs border-b border-slate-200 focus:border-blue-500 outline-none pb-1 bg-transparent w-full sm:w-48 transition-all focus:sm:w-64">
+                                <div class="absolute bottom-0 left-0 h-0.5 w-0 bg-blue-500 group-focus-within:w-full transition-all duration-300"></div>
+                            </div>
+                        </div>
+                        <div id="news-feed" class="space-y-8 custom-scrollbar"></div>
+                    </div>
+
+                    <div id="view-chart" class="hidden h-full space-y-10">
+                        <div class="flex items-center justify-between mb-2">
+                            <h2 class="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Volatility Projection</h2>
+                            <span class="text-[10px] font-bold bg-slate-100 px-3 py-1.5 rounded-full text-slate-500">7-Day Real-Time Cycle</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="marketChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- Core Configuration ---
+        const CONFIG = {
+            CACHE_TTL: 60000, // 60 seconds for higher performance
+            ERROR_SIMULATION: 0.02 // 2% chance for real-world reliability testing
+        };
+
+        let state = {
+            currentArticles: [],
+            marketChart: null,
+            activeVariant: 'A',
+            isLoading: false,
+            cache: {},
+            viewMode: 'list'
+        };
+
+        const nodeData = {
+            'london': { temp: 14, vol: 18, color: '#3b82f6', summary: 'Steady flow. Institutional stability remains optimal for capital injection.' },
+            'new-york': { temp: 22, vol: 48, color: '#f59e0b', summary: 'High volatility surge. Defensive risk mitigation required for Q3 positioning.' },
+            'singapore': { temp: 31, vol: 12, color: '#10b981', summary: 'Minimal friction node. Ideal for rapid organizational growth scaling.' },
+            'tokyo': { temp: 18, vol: 29, color: '#8b5cf6', summary: 'Technological pivot in progress. Monitor for emerging market leadership.' }
+        };
+
+        const mockNewsPool = [
+            { title: "Market Volatility: New Strategic Alignment Needed", source: "Bloomberg", tags: ["Risk", "Market"] },
+            { title: "Quantum Logistics: Scaling Node Efficiency", source: "TechCrunch", tags: ["Growth", "Tech"] },
+            { title: "The Cost of Invisibility in Global Trade", source: "Wired", tags: ["Insight", "Strategy"] },
+            { title: "Organizational Resilience: Q3 Frameworks", source: "Forbes", tags: ["Management"] }
+        ];
+
+        // --- Application Initialization ---
+
+        async function initApp() {
+            loadPreferences();
+            initABTest();
+            await fetchIntel();
+        }
+
+        function loadPreferences() {
+            const savedNode = localStorage.getItem('intel_node');
+            const savedProfile = localStorage.getItem('intel_profile');
+            
+            if (savedNode) document.getElementById('node-select').value = savedNode;
+            if (savedProfile) {
+                document.getElementById('strategy-profile').value = savedProfile;
+                applyProfileTheme(savedProfile);
+            }
+        }
+
+        async function fetchIntel(force = false) {
+            if (state.isLoading) return;
+            
+            const node = document.getElementById('node-select').value;
+            const now = Date.now();
+            
+            if (!force && state.cache[node] && (now - state.cache[node].timestamp < CONFIG.CACHE_TTL)) {
+                updateCacheStatus(true);
+                renderDashboard(state.cache[node].data);
+                return;
+            }
+
+            setLoading(true);
+            updateCacheStatus(false);
+
+            try {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                if (Math.random() < CONFIG.ERROR_SIMULATION) {
+                    throw new Error("ERR_NODE_SYNC: Strategic bandwidth limit reached.");
+                }
+
+                const data = nodeData[node];
+                state.cache[node] = { timestamp: now, data: data };
+                
+                renderDashboard(data);
+                hideError();
+
+            } catch (error) {
+                showError(error.message);
+                renderFallbackState();
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // --- Rendering Logic ---
+
+        function renderDashboard(data) {
+            const nodeName = document.getElementById('node-select').options[document.getElementById('node-select').selectedIndex].text;
+            
+            document.getElementById('weather-display').innerHTML = `
+                <div class="flex items-baseline gap-2">
+                    <span class="text-6xl font-300 tracking-tighter text-slate-800">${data.temp}°</span>
+                    <span class="text-2xl text-slate-400 font-light">C</span>
+                </div>
+                <p class="text-slate-500 font-500 mt-4 text-sm tracking-wide">${nodeName}</p>
+                <div class="mt-4 flex items-center gap-2 text-[10px] font-bold text-emerald-600 uppercase tracking-widest">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Atmospheric Stability High
+                </div>
+            `;
+
+            document.getElementById('vol-value').innerText = `${data.vol}%`;
+            document.getElementById('vol-bar').style.width = `${data.vol}%`;
+            document.getElementById('node-summary').innerText = data.summary;
+            
+            state.currentArticles = mockNewsPool.map(a => ({
+                ...a,
+                title: a.title.replace('Market', nodeName.split(' ')[0])
+            }));
+            
+            renderNews(state.currentArticles);
+            initChart(data.vol, data.color);
+        }
+
+        function renderNews(articles) {
+            const feed = document.getElementById('news-feed');
+            if (articles.length === 0) {
+                feed.innerHTML = `<p class="text-slate-400 text-sm italic py-12 text-center">No matching intel detected.</p>`;
+                return;
+            }
+            feed.innerHTML = articles.map(a => `
+                <div class="group cursor-pointer border-b border-slate-50 pb-6 last:border-0 hover:translate-x-1 transition-all duration-300">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-[9px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded">${a.source}</span>
+                    </div>
+                    <h3 class="text-lg font-500 text-slate-800 group-hover:text-blue-600 transition-colors leading-snug">${a.title}</h3>
+                </div>
+            `).join('');
+        }
+
+        function renderFallbackState() {
+            document.getElementById('node-summary').innerText = "Strategic signal lost. Using last validated organizational metrics.";
+            document.getElementById('news-feed').innerHTML = `
+                <div class="p-12 text-center border-2 border-dashed border-slate-100 rounded-3xl">
+                    <p class="text-slate-400 text-sm font-500">Connection Interrupted</p>
+                    <button onclick="forceRefresh()" class="mt-6 px-6 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-blue-600 transition-all">Reconnect Node</button>
+                </div>
+            `;
+        }
+
+        // --- Interaction Logic ---
+
+        function handleNodeChange() {
+            const node = document.getElementById('node-select').value;
+            localStorage.setItem('intel_node', node);
+            fetchIntel();
+        }
+
+        function handleProfileChange() {
+            const profile = document.getElementById('strategy-profile').value;
+            localStorage.setItem('intel_profile', profile);
+            applyProfileTheme(profile);
+            fetchIntel(true);
+        }
+
+        function applyProfileTheme(profile) {
+            const body = document.getElementById('app-body');
+            const logo = document.getElementById('logo-bg');
+            if (profile === 'risk') {
+                body.className = "bg-slate-50 text-slate-900 min-h-screen selection:bg-amber-100 antialiased";
+                logo.className = "w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center transition-all group-hover:scale-110";
+            } else {
+                body.className = "bg-slate-50 text-slate-900 min-h-screen selection:bg-blue-100 antialiased";
+                logo.className = "w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center transition-all group-hover:scale-110";
+            }
+        }
+
+        function toggleView(mode) {
+            state.viewMode = mode;
+            const listBtn = document.getElementById('list-btn');
+            const chartBtn = document.getElementById('chart-btn');
+            const isList = mode === 'list';
+
+            document.getElementById('view-list').classList.toggle('hidden', !isList);
+            document.getElementById('view-chart').classList.toggle('hidden', isList);
+            
+            listBtn.className = isList ? "px-6 py-2 rounded-lg text-xs font-bold transition-all bg-white shadow-sm" : "px-6 py-2 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-700";
+            chartBtn.className = !isList ? "px-6 py-2 rounded-lg text-xs font-bold transition-all bg-white shadow-sm" : "px-6 py-2 rounded-lg text-xs font-bold transition-all text-slate-500 hover:text-slate-700";
+            
+            if (!isList) state.marketChart.update();
+        }
+
+        function setLoading(loading) {
+            state.isLoading = loading;
+            document.getElementById('loading-overlay').classList.toggle('hidden', !loading);
+        }
+
+        function showError(msg) {
+            const toast = document.getElementById('error-toast');
+            document.getElementById('error-message').innerText = msg;
+            toast.classList.remove('hidden');
+            setTimeout(hideError, 5000);
+        }
+
+        function hideError() { document.getElementById('error-toast').classList.add('hidden'); }
+
+        function updateCacheStatus(isCached) {
+            const el = document.getElementById('cache-status');
+            el.innerText = isCached ? "Node Cached" : "Live Stream";
+            el.className = isCached 
+                ? "text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600" 
+                : "text-[9px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-lg bg-slate-100 text-slate-400";
+        }
+
+        function forceRefresh() { fetchIntel(true); }
+
+        function initChart(baseVol, color) {
+            const ctx = document.getElementById('marketChart').getContext('2d');
+            if (state.marketChart) state.marketChart.destroy();
+            
+            state.marketChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', 'NOW'],
+                    datasets: [{
+                        data: [baseVol-5, baseVol, baseVol+10, baseVol+2, baseVol+15, baseVol+5, baseVol],
+                        borderColor: color,
+                        backgroundColor: color + '05',
+                        fill: true,
+                        tension: 0.45,
+                        borderWidth: 3,
+                        pointRadius: 4,
+                        pointBackgroundColor: color,
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        y: { display: false, min: 0, max: 100 }, 
+                        x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 9, weight: 'bold' }, color: '#94a3b8' } } 
+                    }
+                }
+            });
+        }
+
+        document.getElementById('intel-search').addEventListener('input', (e) => {
+            const q = e.target.value.toLowerCase();
+            const filtered = state.currentArticles.filter(a => a.title.toLowerCase().includes(q));
+            renderNews(filtered);
+        });
+
+        function initABTest() {
+            state.activeVariant = Math.random() > 0.5 ? 'A' : 'B';
+            const banner = document.getElementById('ab-banner');
+            if (state.activeVariant === 'A') {
+                banner.className += " bg-blue-600 text-white shadow-lg shadow-blue-600/10";
+                banner.innerText = "Join the top 2% of organizational nodes for exclusive insights";
+            } else {
+                banner.className += " bg-slate-900 text-blue-400 border-b border-slate-800";
+                banner.innerText = "84% of Supply Chains lack Q3 Visibility. Neutralize your risk now.";
+            }
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
